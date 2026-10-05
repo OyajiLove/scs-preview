@@ -724,8 +724,16 @@ Tabs and the radar mode cycle are local and send nothing.
   .lightbox.open { display: grid; }
   .lightbox img { max-width: 92vw; max-height: 92vh; object-fit: contain; image-rendering: pixelated; }
   /* full-body portrait: top-left of the overview, two rows tall */
-  .body-pn { grid-row: span 2; padding: 0; overflow: hidden; display: flex; align-items: flex-end; justify-content: center; min-height: 640px; }
-  .body-pn img { width: 100%; height: 640px; object-fit: contain; cursor: zoom-in; object-position: center bottom; image-rendering: pixelated; display: block; }
+  /* police line-up: height lines behind the figure, labels on the right; the figure is drawn to scale, so giants fill the board */
+  .body-pn { grid-row: span 2; padding: 0; overflow: hidden; position: relative; min-height: 660px; }
+  .lineup { position: absolute; inset: 0; pointer-events: none; }
+  .lineup i { position: absolute; left: 0; right: 0; height: 0; border-top: 1px solid rgba(224,208,194,.07); }
+  .lineup i.half { border-top-color: rgba(224,208,194,.16); }
+  .lineup i.ft { border-top: 2px solid rgba(224,208,194,.28); }
+  .lineup i.floor { border-top: 2px solid rgba(196,160,96,.45); }
+  .lineup b { position: absolute; right: 10px; transform: translateY(-100%); padding-bottom: 2px; font-family: var(--font-data); font-weight: 500; font-size: 11px; color: var(--muted); }
+  .lineup b.ft { font-size: 13px; color: var(--text); }
+  .body-pn img { position: absolute; left: 50%; transform: translateX(-50%); width: auto; max-width: none; cursor: zoom-in; image-rendering: pixelated; z-index: 1; display: block; }
   .radar-pn { display: grid; grid-template-columns: minmax(300px, 400px) 1fr; gap: 6px 26px; align-items: center; }
   .radar-pn h3 { grid-column: 1 / -1; margin-bottom: 0; }
   .radar-pn svg { width: 100%; height: auto; display: block; overflow: visible; }
@@ -1858,8 +1866,26 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   function bioPanel() { return '<div class="pn"><h3>Bio<button class="link" data-goto="career">Career</button></h3><div class="bio">' + esc(W().bio) + '</div></div>'; }
 
+  // Height in inches from "5 ft 7 in" (or a numeric height_in when the game supplies one).
+  function heightIn(w) {
+    if (w.height_in) return Number(w.height_in);
+    var m = /(\d+)\s*ft\s*(\d+)?/.exec(w.height || ''); return m ? Number(m[1]) * 12 + Number(m[2] || 0) : 70;
+  }
+  // Board runs floor to 8 ft. Portrait art is head-to-toe across ~97% of its height with ~2% below the feet.
+  var BOARD = { floor: 30, px: 600, top_in: 96, lines_from: 48, fig: 0.971, foot_pad: 0.019 };
+  function lineupPanel(w) {
+    var ppi = BOARD.px / BOARD.top_in, lines = '';
+    for (var inch = BOARD.lines_from; inch <= BOARD.top_in; inch += 2) {
+      var y = BOARD.floor + inch * ppi, ft = inch % 12 === 0, half = inch % 6 === 0;
+      lines += '<i class="' + (ft ? 'ft' : half ? 'half' : '') + '" style="bottom:' + y.toFixed(1) + 'px"></i>';
+      if (half) lines += '<b class="' + (ft ? 'ft' : '') + '" style="bottom:' + (y - 2).toFixed(1) + 'px;transform:none">' + Math.floor(inch / 12) + "'" + (inch % 12 ? inch % 12 + '"' : '') + '</b>';
+    }
+    lines += '<i class="floor" style="bottom:' + BOARD.floor + 'px"></i>';
+    var imgH = heightIn(w) * ppi / BOARD.fig, bottom = BOARD.floor - imgH * BOARD.foot_pad;
+    return '<div class="pn body-pn"><div class="lineup">' + lines + '</div><img alt="' + esc(w.name) + '" src="' + PORT + esc(w.portrait) + '" style="height:' + imgH.toFixed(0) + 'px;bottom:' + bottom.toFixed(0) + 'px"></div>';
+  }
   function overview() {
-    var w = W(), body = w.portrait ? '<div class="pn body-pn"><img alt="' + esc(w.name) + '" src="' + PORT + esc(w.portrait) + '"></div>' : '';
+    var w = W(), body = w.portrait ? lineupPanel(w) : '';
     return '<div class="grid wide" style="grid-auto-flow: dense">' + body + radarPanel() + glancePanel() + observedPanel() + programPanel() + sparkPanel() + contractPanel() + healthPanel() + bioPanel() + '</div>';
   }
 
